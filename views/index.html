@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>日文聽力測驗</title>
+    <link href="bootstrap-3.3.7-dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="bootstrap-3.3.7-dist/css/bootstrap-theme.min.css" rel="stylesheet" />
+    <style>
+        body { padding-top: 70px; }
+        .panel-heading a {color: black;}
+        .panel { margin-bottom: 10px; }
+        .panel-heading {
+            text-decoration:underline;
+            font-size: 1em;
+        }
+        #resultItem li{
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+    </style>
+    <script src="javascripts/jquery-latest.min.js"></script>
+    <script src="bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+    {% if reviewMode %}
+    <script> var reviewMode = true; </script>
+    {% endif %}
+    <script>
+//scrict start
+var questions = [];
+var currentQuestionIndex = -1;
+var CurrentAudioName = '';
+var audio = null;
+var enterLock = true;
+var correctCount = 0;
+var waQids = [];
+var loginUser= null;
+
+function test(){
+    
+}
+
+function doTest() {
+    if(typeof reviewMode == "undefined"){
+        var range = getRange();
+        if (range == 0) {
+            alert("未選擇考題範圍！")
+            return;
+        }
+    }
+    var amount = document.getElementById("amount").value;
+    if (isNaN(parseInt(amount)) || (parseInt(amount) < 1) || (parseInt(amount) > 50)) {
+        alert("題數請輸入 1~50 之間的數值！")
+        return;
+    }
+    currentQuestionIndex = -1;
+    document.getElementById("answer").disabled = false;
+    document.getElementById("start").innerText = '重新開始';
+    document.getElementById("repeat").disabled = true;
+    document.getElementById("giveup").disabled = true;
+    correctCount = 0;
+    waQids.length = 0;
+    clearResult();
+    $('#collapse1').collapse("hide");
+    $('#collapse2').collapse("show");
+    $('#collapse3').collapse("show");
+    if(typeof reviewMode == "undefined"){
+        getQuestions(range, amount, nextQuestion);
+    } else{
+        getQuestionsFromWA(amount, nextQuestion);
+    }
+}
+
+function getRange() {
+    var range = 0;
+    var flag = 1;
+    for (var i = 0; i < 5; i++) {
+        var isCheck = document.getElementById("range_n" + (i + 1)).checked;
+        if (isCheck) {
+            range += flag;
+        }
+        flag *= 2;
+    }
+    return range;
+}
+
+function getQuestions(range, amount, callback) {
+    $.ajax({
+        url: '/createquestions/' + range + '/' + amount,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data, status) {
+            console.log(data);
+            questions = data;
+            setStat(0);
+            callback();
+        },
+        error: function(data, status) {
+            alert('產出題目發生錯誤');
+        }
+    });
+}
+
+function getQuestionsFromWA(amount, callback) {
+    $.ajax({
+        url: '/create_questions_from_wa/' + amount,
+        type: 'GET',
+        dataType: 'json',
+        success: function(data, status) {
+            questions = data;
+            setStat(0);
+            callback();
+        },
+        error: function(data, status) {
+            alert('產出題目發生錯誤');
+        }
+    });
+}
+
+function prepareWordAudio(word, callback) {
+    $.ajax({
+        url: '/createsound/'+word,
+        type: 'GET',
+        success: function(data, status) {
+            CurrentAudioName = data;
+            callback();
+        },
+        error: function(data, status) {
+            alert('製作聲音檔發生錯誤');
+        }
+    });
+}
+
+function playWordAudio() {
+    if (audio) {
+        audio.pause();
+    }
+    audio = new Audio('audio_word/' + CurrentAudioName);
+    audio.load();
+    audio.play();
+    audio.onended = function() {
+        document.getElementById("answer").focus();
+        enterLock = false;
+        document.getElementById("repeat").disabled = false;
+        document.getElementById("giveup").disabled = false;
+    };
+}
+
+function detectEnter(e) {
+    if (e.keyCode == 13 && enterLock == false) {
+        enterLock = true;
+        submitAnswer();
+    }
+}
+
+function submitAnswer() {
+    document.getElementById("repeat").disabled = true;
+    document.getElementById("giveup").disabled = true;
+    var eleAnswer = document.getElementById("answer");
+    var ans = eleAnswer.value;
+    eleAnswer.value = '';
+    var correctOrNot = (ans == questions[currentQuestionIndex]['word'])
+    if (correctOrNot == false) {
+        waQids.push(questions[currentQuestionIndex]['qid']);
+    }
+    setResult(ans, correctOrNot);
+    var soundEffectFile = correctOrNot ? "quiz_yes.mp3" : "quiz_no.mp3";
+    var soundEffect = new Audio('audio/' + soundEffectFile);
+    soundEffect.play();
+    soundEffect.onended = function() {
+        nextQuestion();
+    };
+}
+
+function nextQuestion() {
+    currentQuestionIndex++;
+    if (currentQuestionIndex < questions.length) {
+        setKana(questions[currentQuestionIndex]['word']);
+        prepareWordAudio(questions[currentQuestionIndex]['word'], playWordAudio);
+    } else {
+        var eleAnswer = document.getElementById("answer");
+        eleAnswer.value = '';
+        eleAnswer.disabled = true;
+        $(function(){
+            $('#collapse1').collapse("show");
+            $('#collapse2').collapse("hide");
+            $('#testFinistModal').modal('show');
+        }); 
+        document.getElementById("repeat").disabled = true;
+        document.getElementById("giveup").disabled = true;
+    }
+}
+
+function giveup() {
+    document.getElementById("answer").value = '';
+    submitAnswer();
+}
+
+function recordWA() {
+    if(waQids.length==0){
+        alert('此次測驗沒有答錯題目...');
+        return;
+    }
+    var data = {
+        "aid": loginUser['aid'],
+        "qids": waQids
+    };
+    $.ajax({
+        url: '/wrong_answers',
+        type: 'POST',
+        data: data,
+        success: function(data, status) {
+            alert('答錯題目儲存完畢！');
+        },
+        error: function(data, status) {
+            alert('儲存答錯題目時發生錯誤');
+        }
+    });
+}
+
+function deleteWA() {
+    var rightAnswerWids = questions
+                        .filter(function(x){ return waQids.indexOf(x['qid']) == -1 })
+                        .map(function(x){ return x['wid']; });
+    if(rightAnswerWids.length==0){
+        alert('此次測驗沒有答對題目...');
+        return;
+    }
+    var data = { "wids": rightAnswerWids };
+    $.ajax({
+        url: '/wrong_answers',
+        type: 'DELETE',
+        data: data,
+        success: function(data, status) {
+            if (status == 'success') {
+                alert('紀錄刪除完畢！');
+            }
+        },
+        error: function(data, status) {
+            if (status == "error") {
+                alert('刪除紀錄時發生錯誤');
+            }
+        }
+    });
+}
+/** Set elements **/
+
+function setResult(ans, correctOrNot) {
+    var ul = document.getElementById("resultItem");
+    var li = document.createElement("li");
+    li.className += "list-group-item";
+    var div = document.createElement("div");
+    div.className += "row";
+    var question = document.createElement("span");
+    question.className += "col-md-5";
+    var jp_translate_link = 'https://dict.hjenglish.com/jp/jc/'+questions[currentQuestionIndex]['word'];
+    question.innerHTML = '<a href="'+jp_translate_link+'" target="_blank">'+questions[currentQuestionIndex]['word']+'</a>';
+    var answer = document.createElement("span");
+    answer.className += "col-md-6";
+    answer.innerText = ans;
+    var result1 = document.createElement("span");
+    result1.className += "col-md-1";
+    var result2 = document.createElement("span");
+    result2.className = correctOrNot ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-remove';
+    result2.style.color = correctOrNot ? 'green' : 'red';
+    result1.appendChild(result2);
+    div.appendChild(question);
+    div.appendChild(answer);
+    div.appendChild(result1);
+    li.appendChild(div)
+    ul.appendChild(li);
+    //stat
+    if (correctOrNot) {
+        setStat(++correctCount);
+    }
+}
+
+function setStat(correctCount) {
+    var str = '' + correctCount + ' / ' + questions.length;
+    document.getElementById("correctCount").innerText = str;
+    str = '' + correctCount * 100 / questions.length + '%';
+    document.getElementById("correctRate").innerText = str;
+}
+
+function clearResult() {
+    var ul = document.getElementById("resultItem");
+    while (ul.firstChild) {
+        ul.removeChild(ul.firstChild);
+    }
+}
+
+function setKana(word) {
+    var katakana = 'アイウエオカキクケコガギグゲゴサシスセソザジズゼゾタチツテトダヂヅデドナニヌネノハヒフヘホバビブベボパピプペポマミムメモヤユヨラリルレロワヲン';
+    var isKatakana = false;
+    for (var i = 0; i < word.length; i++) {
+        if (katakana.indexOf(word[i]) !== -1) {
+            isKatakana = true;
+            break;
+        }
+    }
+    if (isKatakana) {
+        document.getElementById("kana").innerHTML = '片假名'
+    } else {
+        document.getElementById("kana").innerHTML = '平假名'
+    }
+}
+
+//scrict end
+    </script>
+</head>
+
+<body>
+    {% include "./navbar.html" %}
+    <div class="container">
+        <div class="row">
+            <div class="panel panel-default">
+                <div class="panel-heading"><a data-toggle="collapse" href="#collapse1">出題設定</a></div>
+                <div id="collapse1" class="panel-collapse collapse in">
+                    <div class="panel-body">
+                        <div class="row">
+                            <div class="col-md-1"><span class="label label-default">考題範圍</span></div>
+                            <div class="col-md-11 form-inline">
+                            {% if reviewMode %}
+                            <span class="label label-primary">複習考</span>
+                            {% else %}
+							<label class="checkbox-inline"><input type="checkbox" id="range_n5" checked>N5</label>
+							<label class="checkbox-inline"><input type="checkbox" id="range_n4">N4</label>
+							<label class="checkbox-inline"><input type="checkbox" id="range_n3">N3</label>
+							<label class="checkbox-inline"><input type="checkbox" id="range_n2">N2</label>
+							<label class="checkbox-inline"><input type="checkbox" id="range_n1">N1</label>
+                            {% endif %}
+                            </div>
+                        </div>
+                        <div class="row" style="padding-top:10px;">
+                            <div class="col-md-1"><span class="label label-default">題數</span></div>
+                            <div class="col-md-11">
+                                <input id="amount" type="text" value="5" class="form-control input-sm" style="width:40px; font-size:1em;">
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <button id="start" type="button" class="btn btn-lg btn-success" onclick="doTest();">開始</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="row" >
+            <div class="panel panel-default">
+                <div class="panel-heading"><a data-toggle="collapse" href="#collapse2">作答</a></div>
+                <div id="collapse2" class="panel-collapse collapse">
+                    <div class="panel-body">
+                        <div class="text-center">
+                            <button id="repeat" type="button" class="btn btn-success" onclick="playWordAudio();" disabled>重播</button>
+                            <button id="giveup" type="button" class="btn btn-success" onclick="giveup();" disabled>放棄</button>
+                        </div>
+                        <div class="input-group" style="padding: 10px 80px 10px 80px;">
+                            <span id="kana" class="input-group-addon">平假名/片假名</span>
+                            <input id="answer" type="text" class="form-control input-lg" onkeypress="detectEnter(event);" disabled>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="row">
+            <div class="panel panel-default">
+                <div class="panel-heading"><a data-toggle="collapse" href="#collapse3">統計</a></div>
+                <div id="collapse3" class="panel-collapse collapse">
+                    <div class=" rowPadding row">
+                        <div class="col-md-5">
+                            <span class="label label-primary">答對題數</span>
+                            <span id="correctCount">0 / 0</span>
+                        </div>
+                        <div class="col-md-7 text-right">
+                            <span class="label label-primary">正確率</span>
+                            <span id="correctRate">0 %</span>
+                        </div>
+                    </div>
+                    <ul class="list-group">
+                        <li class="list-group-item" style="background-color:#f5f5f5;">
+                            <div class="row">
+                                <span class="col-md-5">答案</span>
+                                <span class="col-md-6">作答內容</span>
+                                <span class="col-md-1"></span>
+                            </div>
+                        </li>
+                    </ul>
+    
+                    <ul id="resultItem" class="list-group">
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="testFinistModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                        <h4 class="modal-title" id="myModalLabel">題目已出完！</h4>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">關閉</button>
+                    {% if loginUser && !reviewMode %}
+                    <button type="button" class="btn btn-default" data-dismiss="modal" onclick="recordWA();">儲存答錯題目</button>
+                    {% elseif reviewMode %}
+                    <button type="button" class="btn btn-default" data-dismiss="modal" onclick="deleteWA();">將答對題目從紀錄中移除</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

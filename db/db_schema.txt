@@ -1,0 +1,21 @@
+CREATE TABLE account2 (
+    aid SERIAL,
+    username varchar(128) NOT NULL,
+    password varchar(60) NOT NULL,
+    PRIMARY KEY (aid)
+);
+
+CREATE TABLE question2 (
+    qid SERIAL,
+    word text NOT NULL,
+    difficulty smallint NOT NULL,
+    PRIMARY KEY (qid)
+);
+
+CREATE TABLE wrong_answer2 (
+    wid SERIAL,
+    aid integer references account(aid),
+    qid integer references question(qid),
+    timestamp timestamp without time zone DEFAULT now(),
+    PRIMARY KEY (wid)
+);

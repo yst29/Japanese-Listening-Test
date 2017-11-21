@@ -1,0 +1,24 @@
+{
+  "name": "jp_listen",
+  "version": "1.0.0",
+  "description": "japanese words listening test",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Benson Yu",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^1.0.3",
+    "body-parser": "^1.18.2",
+    "connect-redis": "^3.3.2",
+    "express": "^4.15.4",
+    "express-session": "^1.15.6",
+    "helmet": "^3.9.0",
+    "pg": "^7.3.0",
+    "redis": "^2.8.0",
+    "swig": "^1.4.2",
+    "uuid": "^3.1.0"
+  }
+}

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>答錯題目記錄</title>
+    <link href="bootstrap-3.3.7-dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="bootstrap-3.3.7-dist/css/bootstrap-theme.min.css" rel="stylesheet">
+    <script src="javascripts/jquery-latest.min.js"></script>
+    <style>
+        body { padding-top: 70px; }
+        .container {
+            width: 50%;
+        }
+    </style>
+    <script>
+        //scrict start
+        var loginUser = null;
+        function deleteWA(){
+            var checkedItems = Array.from(document.querySelectorAll("input[type='checkbox']:checked"))
+                .map(function(x){ return x.value; });
+            var data = { "wids": checkedItems };
+            $.ajax({
+                url: '/wrong_answers',
+                type: 'DELETE',
+                data: data,
+                success: function(data, status) {
+                    if (status == 'success') {
+                        location.reload();
+                    }
+                },
+                error: function(data, status) {
+                    if (status == "error") {
+                        alert('刪除所選題目發生錯誤');
+                    }
+                }
+            });
+        }
+    </script>
+</head>
+
+<body>
+    {% include "./navbar.html" %}
+    <div class="container">
+        <div class="row">
+            {% if waList.length>0 %}
+            <table class="table">
+                <thead><tr class='text-center'>
+                    <th></th><th>字彙</th><th>字庫</th><th>建立時間</th>
+                </tr></thead>
+            <tbody>
+                {% for wa in waList %}
+                <tr>
+                    <td><input type="checkbox" value="{{ wa.wid }}"/></td>
+                    <td>{{ wa.word }}</td><td>N{{ wa.difficulty }}</td><td>{{ wa.timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-lg btn-success" onclick="deleteWA()">刪除勾選</button>
+        <button type="button" class="btn btn-lg btn-success" onclick="location.href='/?mode=review';">開始複習考</button>
+        {% else %}
+        <h1 class="text-center">無答錯題目記錄</h1>
+        {% endif %}
+    </div>
+    
+</body>
+</html>

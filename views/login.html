@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>登入</title>
+    <meta charset="utf-8" />
+    <link href="bootstrap-3.3.7-dist/css/bootstrap.min.css" rel="stylesheet">
+	<link href="bootstrap-3.3.7-dist/css/bootstrap-theme.min.css" rel="stylesheet">
+    <script src="javascripts/jquery-latest.min.js"></script>
+    <script src="javascripts/sha256.min.js"></script>
+    <style>
+        html, body {
+            margin:0; padding:0; height:100%;
+        }
+        #floater { float:left; height:50%; margin-bottom:-200px;
+        }
+        #middle {  clear:both; height:400px; position:relative; }
+    </style>
+    <script>
+        //scrict start
+        function login() {
+            var uname = $('#uname').val(),
+                pwd = $('#pwd').val(),
+                hash = sha256(pwd);
+
+            var data = {
+                "uname": uname,
+                "hash": hash
+            };
+            $.ajax({
+                url: '/login',
+                type: 'POST',
+                data: data,
+                success: function(data, status) {
+                    location.href = '/';
+                },
+                error: function(data, status) {
+                    $("#hint").removeAttr("style");
+                    $('#hint').html('登入失敗');
+                }
+            });
+        }
+        //scrict end
+    </script>
+</head>
+
+<body>
+    {% include "./navbar.html" %}
+    <div id="floater"></div>
+    <div id="middle">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 col-md-offset-4">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h3 class="panel-title">會員登入</h3>
+                        </div>
+                        <div class="panel-body">
+                            <form accept-charset="UTF-8" role="form">
+                                <fieldset>
+                                    <div class="form-group">
+                                        <input class="form-control" placeholder="帳號" id="uname" type="text">
+                                    </div>
+                                    <div class="form-group">
+                                        <input class="form-control" placeholder="密碼" id="pwd" type="password" value="">
+                                    </div>
+                                    <input class="btn btn-lg btn-success btn-block" value="Login" onclick="login();">
+                                    <button type="button" class="btn btn-link" onclick="location.href = '/register';">沒有帳號嗎？請點此註冊</button>
+                                    <div id="hint" class="alert alert-danger text-center" role="alert" style="display:none">123</div>
+                                </fieldset>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
